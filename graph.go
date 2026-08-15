@@ -249,14 +249,22 @@ func (s *Service) Order() ([]string, error) {
 				remaining[t.Name] = true
 			}
 		}
-		return nil, &cycleErr{path: findCyclePath(remaining, succ)}
+		// Build dependency edges (task -> its dependencies) for cycle path reporting
+		deps := make(map[string][]string)
+		for _, t := range s.tasks {
+			if remaining[t.Name] {
+				deps[t.Name] = t.DependsOn
+			}
+		}
+		return nil, &cycleErr{path: findCyclePath(remaining, deps)}
 	}
 	return order, nil
 }
 
-// findCyclePath performs a DFS over the remaining (cyclic) subgraph and returns
-// the first cycle found as a path that closes back on its first node.
-func findCyclePath(remaining map[string]bool, succ map[string][]string) []string {
+// findCyclePath performs a DFS over the remaining (cyclic) subgraph following
+// dependency edges and returns the first cycle found as a path that closes back
+// on its first node.
+func findCyclePath(remaining map[string]bool, deps map[string][]string) []string {
 	const (
 		white = 0
 		gray  = 1
@@ -276,7 +284,7 @@ func findCyclePath(remaining map[string]bool, succ map[string][]string) []string
 	dfs = func(n string) bool {
 		color[n] = gray
 		stack = append(stack, n)
-		for _, m := range succ[n] {
+		for _, m := range deps[n] {
 			if !remaining[m] {
 				continue
 			}
